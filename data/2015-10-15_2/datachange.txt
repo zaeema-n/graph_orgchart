@@ -1,0 +1,8 @@
+1. RENAME Minister of Transport (7) -> Minister of Transport & Civil Aviation (51)
+
+2. RENAME Minister of University Education & Highways (11)-> Minister of Higher Education & Highways
+
+3. MOVE "Sri Lanka Institute of Information Technology (SLIIT) and all information technology centres affiliated to SLIIT" department from "Minister of Skills Development & Vocational Training" (18) to "Minister of Higher Education & Highways"
+
+4. MOVE "Sri Lanka Institute of Advanced Technological Education" (176) department from "Minister of Skills Development & Vocational Training" (18) to "Minister of Higher Education & Highways"
+

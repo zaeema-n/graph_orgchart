@@ -1,0 +1,5 @@
+gov_id,min_id,start_time,end_time,active,operation,
+1,7,,15-10-15,FALSE,update,* delete old minister of transport
+1,51,15-10-15,,TRUE,add,* add new renamed minister of transport
+1,11,,15-10-15,FALSE,update,* delete old minister of university
+1,52,15-10-15,,TRUE,add,* create new renamed minister of university
