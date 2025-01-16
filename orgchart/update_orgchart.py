@@ -141,10 +141,6 @@ def add_entity(tx, transaction, entity_counters):
             raise ValueError(f"Unknown child type: {child_type}")
         
         prefix = f"gzt_{child_type[:3].lower()}"  # Use the first three letters of the type
-        # print(child_type)
-        # print(entity_counters[child_type])
-        # print(type(entity_counters[child_type]))
-        # print=f"entity counter: {entity_counters[child_type]}"
         entity_counter = entity_counters[child_type]+1
         new_entity_id = f"{prefix}_{entity_counter}"
 
@@ -177,12 +173,7 @@ def add_entity(tx, transaction, entity_counters):
 def execute_transactions():
     transactions = load_transactions()
     
-    # minister_counter = 1  # Counter for new ministers (e.g., gzt_min_1)
-    # department_counter = 1  # Counter for new departments (e.g., gzt_dep_1)
-
     entity_counters = {"Minister": 0, "Department": 0}  # Initialize counters for entity types
-    # print(entity_counters["Minister"])
-    # print(entity_counters["Department"])
     
     
     with neo4j_interface.driver.session() as session:
