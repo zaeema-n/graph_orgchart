@@ -15,7 +15,8 @@ def load_transactions():
     base_folder = os.path.join("..", "data/2015-10-15_2")  # Adjust path if needed
     files = {
         "Rename": os.path.join(base_folder, "RENAME.csv"),
-        "Move": os.path.join(base_folder, "MOVE.csv")
+        "Move": os.path.join(base_folder, "MOVE.csv"),
+        "Add": os.path.join(base_folder, "ADD.csv")
     }
 
     transactions = []
@@ -29,15 +30,19 @@ def load_transactions():
     return transactions
 
 # Function to handle renaming of a minister
-def rename_minister(tx, transaction, minister_counter):
+def rename_minister(tx, transaction, entity_counters):
     try:
+
+        # Increment minister counter and generate a new ID
+        new_minister_id = f"gzt_min_{entity_counters['Minister']+1}"
+        
+
         # Create new minister
         query_create_new = """
         MERGE (new:Minister {name: $new})
         ON CREATE SET new.id = $new_id
         """
         
-        new_minister_id = f"gzt_min_{minister_counter}"
         result = tx.run(query_create_new, new=transaction["new"], new_id=new_minister_id)
         print(f"Created new minister: {transaction['new']}, Result: {result.consume().counters.nodes_created} node(s) created")
 
@@ -46,11 +51,6 @@ def rename_minister(tx, transaction, minister_counter):
         MATCH (gov:Government {name: 'Government of Sri Lanka'}), (new:Minister {name: $new})
         CREATE (gov)-[:HAS_MINISTER {start_time: $start_time, end_time: $end_time}]->(new)
         """
-        # parameters_create_relationship = {
-        #     "new": transaction["new"],  # Name of the new minister
-        #     "start_time": transaction["date"],  # Assuming the date is in the transaction
-        #     "end_time": None  # Or specify the appropriate value for end_time (e.g., null or "undefined")
-        # }
 
         result = tx.run(query_create_relationship, new=transaction["new"], start_time=transaction["date"], end_time=-1)
         print(f"Created HAS_MINISTER relationship, Result: {result.consume().counters.relationships_created} relationship(s) created")
@@ -95,14 +95,15 @@ def rename_minister(tx, transaction, minister_counter):
         result = tx.run(query_rename_rel, old=transaction["old"], new=transaction["new"], start_time=transaction["date"])
         print(f"Created RENAMED_TO relationship, Result: {result.consume().counters.relationships_created} relationship(s) created")
 
-        return minister_counter + 1  # Increment the minister counter
-
+        return entity_counters['Minister'] + 1
+    
     except Exception as e:
         print(f"Error processing rename transaction: {transaction['transaction_id']}, Error: {e}")
         raise  # Rethrow the exception to allow rollback
+    
 
 # Function to handle moving a department
-def move_department(tx, transaction, department_counter):
+def move_department(tx, transaction):
     try:
         # Create new relationships between the new minister parent and the department child
         query_create = """
@@ -121,18 +122,68 @@ def move_department(tx, transaction, department_counter):
         result = tx.run(query_terminate, old_parent=transaction["old_parent"], child=transaction["child"], end_time=transaction["date"])
         print(f"Terminated old department relationship, Result: {result.consume().counters.properties_set} property(ies) set")
 
-        return department_counter + 1  # Increment the department counter
-
     except Exception as e:
         print(f"Error processing move transaction: {transaction['transaction_id']}, Error: {e}")
         raise  # Rethrow the exception to allow rollback
+
+def add_entity(tx, transaction, entity_counters):
+    try:
+        # Extract details from the transaction
+        parent = transaction["parent"]
+        child = transaction["child"]
+        date = transaction["date"]
+        parent_type = transaction["parent_type"]
+        child_type = transaction["child_type"]
+        rel_type = transaction["rel_type"]
+
+        # Determine the ID for the new child entity using the child type
+        if child_type not in entity_counters:
+            raise ValueError(f"Unknown child type: {child_type}")
+        
+        prefix = f"gzt_{child_type[:3].lower()}"  # Use the first three letters of the type
+        # print(child_type)
+        # print(entity_counters[child_type])
+        # print(type(entity_counters[child_type]))
+        # print=f"entity counter: {entity_counters[child_type]}"
+        entity_counter = entity_counters[child_type]+1
+        new_entity_id = f"{prefix}_{entity_counter}"
+
+        # Create the new child entity
+        query_create_entity = f"""
+        MERGE (child:{child_type} {{name: $child}})
+        ON CREATE SET child.id = $entity_id
+        """
+        result = tx.run(query_create_entity, child=child, entity_id=new_entity_id)
+        print(f"Created entity: {child} ({child_type}), Result: {result.consume().counters.nodes_created} node(s) created")
+
+        # Create the relationship from the parent to the child
+        query_create_relationship = f"""
+        MATCH (parent:{parent_type} {{name: $parent}}), (child:{child_type} {{name: $child}})
+        MERGE (parent)-[:{rel_type} {{start_time: $start_time, end_time: -1}}]->(child)
+        """
+        result = tx.run(query_create_relationship, parent=parent, child=child, start_time=date)
+        print(f"Created relationship from {parent} to {child}, Result: {result.consume().counters.relationships_created} relationship(s) created")
+
+        # Increment the counter for the specific entity type
+        return entity_counter
+
+    except Exception as e:
+        print(f"Error processing add transaction: {transaction['transaction_id']}, Error: {e}")
+        raise  # Rethrow the exception to allow rollback
+
+
 
 # Main function to load transactions and execute them in order
 def execute_transactions():
     transactions = load_transactions()
     
-    minister_counter = 1  # Counter for new ministers (e.g., gzt_min_1)
-    department_counter = 1  # Counter for new departments (e.g., gzt_dep_1)
+    # minister_counter = 1  # Counter for new ministers (e.g., gzt_min_1)
+    # department_counter = 1  # Counter for new departments (e.g., gzt_dep_1)
+
+    entity_counters = {"Minister": 0, "Department": 0}  # Initialize counters for entity types
+    # print(entity_counters["Minister"])
+    # print(entity_counters["Department"])
+    
     
     with neo4j_interface.driver.session() as session:
         with session.begin_transaction() as tx:
@@ -140,11 +191,15 @@ def execute_transactions():
                 try:
                     # Identify the correct function to call based on file type and type
                     if transaction["file_type"] == "Rename" and transaction["type"] == "minister":
-                        minister_counter = rename_minister(tx, transaction, minister_counter)
+                        entity_counters["Minister"] = rename_minister(tx, transaction, entity_counters)
                         print(f"Processed Rename Minister transaction: {transaction['transaction_id']}")
                     elif transaction["file_type"] == "Move" and transaction["type"] == "department":
-                        department_counter = move_department(tx, transaction, department_counter)
+                        move_department(tx, transaction)
                         print(f"Processed Move Department transaction: {transaction['transaction_id']}")
+                    elif transaction["file_type"] == "Add":
+                        new_counter = add_entity(tx, transaction, entity_counters)
+                        entity_counters[transaction["child_type"]] = new_counter
+                        print(f"Processed Add transaction: {transaction['transaction_id']}")
                 except Exception as e:
                     print(f"Error processing transaction: {transaction['transaction_id']}, Error: {e}")
                     tx.rollback()
