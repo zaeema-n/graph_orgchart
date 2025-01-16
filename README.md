@@ -1,4 +1,4 @@
-# doctracer
+# OrgChart 2.0
 
 ## Prerequisites
 
@@ -6,9 +6,9 @@
 mamba create -n graph_orgchart
 ```
 
-### Setup Neo4j
+## Setup Neo4j
 
-#### Environment Variables
+### Environment Variables
 
 Before using the `Neo4jInterface`, ensure the following environment variables are set:
 
@@ -36,8 +36,7 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
 ```
 
-
-#### Running the Docker Container
+### Running the Docker Container
 
 To run the Docker container with the environment variables from the `.env` file (for the first time running the container after building), use the following command:
 
@@ -57,4 +56,20 @@ This allows you to interact with the running Docker container by opening a shell
 
 ```bash
 docker exec -it graph_orgchart_server bash
+```
+
+## Inserting data into the database
+
+To insert the initial data, run `orgchart/setup_db.py`. This file inserts the full tabular data from the `2015-09-21` gazette (csv files found at `data/2015-09-21`).
+
+To update the db with a new amendment, run `orgchart/update_orgchart.py`. This file modifies the db according to the `2015-10-15` gazette amendment (csv files found at `data/2015-10-15_2`).
+
+### Viewing data
+
+To directly view and interact with the database, visit `localhost:7474`. Try out the following cypher query:
+
+```cypher
+match(g:Government)-[r]->(m:Minister)-[y]->(d:Department)
+where m.name="Minister of University Education and Highways" or m.name="Minister of Higher Education and Highways" or m.name="Minister of Higher Education and Highways" or m.name="Minister of Skills Development and Vocational Training"
+return m,g,d
 ```
