@@ -16,7 +16,8 @@ def load_transactions():
     files = {
         "Rename": os.path.join(base_folder, "RENAME.csv"),
         "Move": os.path.join(base_folder, "MOVE.csv"),
-        "Add": os.path.join(base_folder, "ADD.csv")
+        "Add": os.path.join(base_folder, "ADD.csv"),
+        "Terminate": os.path.join(base_folder, "TERMINATE.csv")
     }
 
     transactions = []
@@ -167,6 +168,28 @@ def add_entity(tx, transaction, entity_counters):
         print(f"Error processing add transaction: {transaction['transaction_id']}, Error: {e}")
         raise  # Rethrow the exception to allow rollback
 
+def terminate_entity(tx, transaction):
+    try:
+        # Extract details from the transaction
+        parent = transaction["parent"]
+        child = transaction["child"]
+        date = transaction["date"]
+        parent_type = transaction["parent_type"]
+        child_type = transaction["child_type"]
+        rel_type = transaction["rel_type"]
+
+        # Match the parent and child nodes and the specified relationship
+        query_terminate_relationship = f"""
+        MATCH (parent:{parent_type} {{name: $parent}})-[rel:{rel_type}]-(child:{child_type} {{name: $child}})
+        WHERE rel.end_time = -1
+        SET rel.end_time = $end_time
+        """
+        result = tx.run(query_terminate_relationship, parent=parent, child=child, end_time=date)
+        print(f"Terminated relationship from {parent} to {child}, Result: {result.consume().counters.properties_set} property(ies) set")
+
+    except Exception as e:
+        print(f"Error processing terminate transaction: {transaction['transaction_id']}, Error: {e}")
+        raise  # Rethrow the exception to allow rollback
 
 
 # Main function to load transactions and execute them in order
@@ -191,6 +214,9 @@ def execute_transactions():
                         new_counter = add_entity(tx, transaction, entity_counters)
                         entity_counters[transaction["child_type"]] = new_counter
                         print(f"Processed Add transaction: {transaction['transaction_id']}")
+                    elif transaction["file_type"] == "Terminate":
+                        terminate_entity(tx, transaction)
+                        print(f"Processed Terminate transaction: {transaction['transaction_id']}")
                 except Exception as e:
                     print(f"Error processing transaction: {transaction['transaction_id']}, Error: {e}")
                     tx.rollback()
