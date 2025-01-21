@@ -1,3 +1,3 @@
 transaction_id,parent,parent_type,child,child_type,rel_type,date
-2611/11_tr_5,"Minister of Post, Postal Services & Muslim Religious Affairs",Minister,Department of Envelopes,Department,HAS_DEPARTMENT,2015-10-15
-2611/11_tr_6,Government of Sri Lanka,Government,Minister of Corruption,Minister,HAS_MINISTER,2015-10-15 
+2611/11_tr_05,"Minister of Post, Postal Services & Muslim Religious Affairs",minister,Department of Envelopes,department,HAS_DEPARTMENT,2015-10-15
+2611/11_tr_06,Government of Sri Lanka,government,Minister of Corruption,minister,HAS_MINISTER,2015-10-15 

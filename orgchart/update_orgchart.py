@@ -17,7 +17,8 @@ def load_transactions():
         "Rename": os.path.join(base_folder, "RENAME.csv"),
         "Move": os.path.join(base_folder, "MOVE.csv"),
         "Add": os.path.join(base_folder, "ADD.csv"),
-        "Terminate": os.path.join(base_folder, "TERMINATE.csv")
+        "Terminate": os.path.join(base_folder, "TERMINATE.csv"),
+        "Merge": os.path.join(base_folder, "MERGE.csv")
     }
 
     transactions = []
@@ -35,12 +36,12 @@ def rename_minister(tx, transaction, entity_counters):
     try:
 
         # Increment minister counter and generate a new ID
-        new_minister_id = f"gzt_min_{entity_counters['Minister']+1}"
+        new_minister_id = f"gzt_min_{entity_counters['minister']+1}"
         
 
         # Create new minister
         query_create_new = """
-        MERGE (new:Minister {name: $new})
+        MERGE (new:minister {name: $new})
         ON CREATE SET new.id = $new_id
         """
         
@@ -49,7 +50,7 @@ def rename_minister(tx, transaction, entity_counters):
 
         # Create relationship from Government (Government of Sri Lanka) to new Minister (HAS_MINISTER)
         query_create_relationship = """
-        MATCH (gov:Government {name: 'Government of Sri Lanka'}), (new:Minister {name: $new})
+        MATCH (gov:government {name: 'Government of Sri Lanka'}), (new:minister {name: $new})
         CREATE (gov)-[:HAS_MINISTER {start_time: $start_time, end_time: $end_time}]->(new)
         """
 
@@ -58,9 +59,9 @@ def rename_minister(tx, transaction, entity_counters):
 
         # Create relationships between the old minister's departments and the new minister
         query_transfer = """
-        MATCH (old:Minister {name: $old})-[r:HAS_DEPARTMENT]->(d: Department)
+        MATCH (old:minister {name: $old})-[r:HAS_DEPARTMENT]->(d: department)
         WHERE r.end_time = -1
-        MATCH (new:Minister {name: $new})
+        MATCH (new:minister {name: $new})
         MERGE (new)-[:HAS_DEPARTMENT {start_time: $start_time, end_time: -1}]->(d)
         """
 
@@ -69,7 +70,7 @@ def rename_minister(tx, transaction, entity_counters):
 
         # Terminate old government minister relationship
         query_terminate = """
-        MATCH (:Government)-[r:HAS_MINISTER]->(old:Minister {name: $old})
+        MATCH (:government)-[r:HAS_MINISTER]->(old:minister {name: $old})
         WHERE r.end_time = -1
         SET r.end_time = $end_time
         """
@@ -79,7 +80,7 @@ def rename_minister(tx, transaction, entity_counters):
 
         # Terminate old minister to department relationships
         query_terminate_departments = """
-        MATCH (old:Minister {name: $old})-[r:HAS_DEPARTMENT]->(d)
+        MATCH (old:minister {name: $old})-[r:HAS_DEPARTMENT]->(d)
         WHERE r.end_time = -1
         SET r.end_time = $end_time
         """
@@ -89,14 +90,14 @@ def rename_minister(tx, transaction, entity_counters):
 
         # Create RENAMED_TO relationship between old and new ministers
         query_rename_rel = """
-        MATCH (old:Minister {name: $old}), (new:Minister {name: $new})
+        MATCH (old:minister {name: $old}), (new:minister {name: $new})
         MERGE (old)-[:RENAMED_TO {start_time: $start_time}]->(new)
         """
 
         result = tx.run(query_rename_rel, old=transaction["old"], new=transaction["new"], start_time=transaction["date"])
         print(f"Created RENAMED_TO relationship, Result: {result.consume().counters.relationships_created} relationship(s) created")
 
-        return entity_counters['Minister'] + 1
+        return entity_counters['minister'] + 1
     
     except Exception as e:
         print(f"Error processing rename transaction: {transaction['transaction_id']}, Error: {e}")
@@ -108,7 +109,7 @@ def move_department(tx, transaction):
     try:
         # Create new relationships between the new minister parent and the department child
         query_create = """
-        MATCH (new_parent:Minister {name: $new_parent}), (child:Department {name: $child})
+        MATCH (new_parent:minister {name: $new_parent}), (child:department {name: $child})
         MERGE (new_parent)-[:HAS_DEPARTMENT {start_time: $start_time, end_time: -1}]->(child)
         """
         result = tx.run(query_create, new_parent=transaction["new_parent"], child=transaction["child"], start_time=transaction["date"])
@@ -116,7 +117,7 @@ def move_department(tx, transaction):
 
         # Terminate the old parent to department relationships
         query_terminate = """
-        MATCH (old_parent:Minister {name: $old_parent})-[r:HAS_DEPARTMENT]->(child:Department {name: $child})
+        MATCH (old_parent:minister {name: $old_parent})-[r:HAS_DEPARTMENT]->(child:department {name: $child})
         WHERE r.end_time = -1
         SET r.end_time = $end_time
         """
@@ -191,12 +192,156 @@ def terminate_entity(tx, transaction):
         print(f"Error processing terminate transaction: {transaction['transaction_id']}, Error: {e}")
         raise  # Rethrow the exception to allow rollback
 
+def merge_ministers(tx, transaction, entity_counters):
+    try:
+        # Parse the old ministers array from the transaction
+        old_ministers = eval(transaction["old"])  # Convert string representation of array to list
+        new_minister = transaction["new"]
+        date = transaction["date"]
+        
+        # Generate a unique ID for the new minister
+        if "minister" not in entity_counters:
+            raise ValueError("Entity counter for 'Minister' is not initialized")
+        
+        # entity_counters["Minister"] += 1
+        new_minister_id = f"gzt_min_{entity_counters['minister']+1}"
+
+        # Create the new minister entity
+        query_create_new = """
+        MERGE (new:minister {name: $new})
+        ON CREATE SET new.id = $new_id
+        """
+        result = tx.run(query_create_new, new=new_minister, new_id=new_minister_id)
+        print(f"Created new minister: {new_minister}, "
+              f"Result: {result.consume().counters.nodes_created} node(s) created")
+
+        # Create HAS_MINISTER relationship from Government of Sri Lanka to the new minister
+        query_create_has_minister = """
+        MATCH (gov:government {name: 'Government of Sri Lanka'}), (new:minister {name: $new})
+        MERGE (gov)-[:HAS_MINISTER {start_time: $date, end_time: -1}]->(new)
+        """
+        result = tx.run(query_create_has_minister, new=new_minister, date=date)
+        print(f"Created HAS_MINISTER relationship from Government of Sri Lanka to {new_minister}, "
+            f"Result: {result.consume().counters.relationships_created} relationship(s) created")
+    
+        
+        # Loop through each old minister to transfer relationships and terminate them
+        for old_minister in old_ministers:
+            # Transfer relationships from old minister's departments to new minister
+            query_transfer_departments = """
+            MATCH (old:minister {name: $old})-[r:HAS_DEPARTMENT]->(dept:department)
+            WHERE r.end_time = -1
+            MATCH (new:minister {name: $new})
+            MERGE (new)-[:HAS_DEPARTMENT {start_time: $date, end_time: -1}]->(dept)
+            """
+            result = tx.run(query_transfer_departments, old=old_minister, new=new_minister, date=date)
+            print(f"Created relationship(s) from {old_minister} department(s) to {new_minister}, "
+                  f"Result: {result.consume().counters.relationships_created} relationship(s) created")
+
+            # Terminate government -> old minister relationship
+            query_terminate_government_relation = """
+            MATCH (gov:government {name: 'Government of Sri Lanka'})-[r:HAS_MINISTER]->(old:minister {name: $old})
+            WHERE r.end_time = -1
+            SET r.end_time = $date
+            """
+            result = tx.run(query_terminate_government_relation, old=old_minister, date=date)
+            print(f"Terminated government relationship with {old_minister}, "
+                  f"Result: {result.consume().counters.properties_set} property(s) updated")
+
+            # Terminate old minister -> department relationships
+            query_terminate_department_relations = """
+            MATCH (old:minister {name: $old})-[r:HAS_DEPARTMENT]->(dept:department)
+            WHERE r.end_time = -1
+            SET r.end_time = $date
+            """
+            result = tx.run(query_terminate_department_relations, old=old_minister, date=date)
+            print(f"Terminated department relationships for {old_minister}, "
+                  f"Result: {result.consume().counters.properties_set} property(s) updated")
+
+            # Create old minister -> new minister MERGED_INTO relationship
+            query_create_merged_into = """
+            MATCH (old:minister {name: $old}), (new:minister {name: $new})
+            MERGE (old)-[:MERGED_INTO {start_time: $date}]->(new)
+            """
+            result = tx.run(query_create_merged_into, old=old_minister, new=new_minister, date=date)
+            print(f"Created MERGED_INTO relationship from {old_minister} to {new_minister}, "
+                  f"Result: {result.consume().counters.relationships_created} relationship(s) created")
+
+        return entity_counters['minister']+1
+
+    except Exception as e:
+        print(f"Error processing merge transaction: {transaction['transaction_id']}, Error: {e}")
+        raise  # Rethrow the exception to allow rollback
+
+def merge_departments(tx, transaction, entity_counters):
+    try:
+        # Extract details from the transaction
+        print(transaction["old"])
+        old_departments = eval(transaction["old"])  # Convert string representation of list to actual list
+        new_department = transaction["new"]
+        date = transaction["date"]
+
+        # Determine the ID for the new department
+        if "department" not in entity_counters:
+            raise ValueError("Department counter not initialized")
+        
+        # entity_counters["Department"] += 1
+        new_department_id = f"gzt_dep_{entity_counters['department']+1}"
+
+        # Step 1: Create the new department
+        query_create_department = """
+        MERGE (new:department {name: $new})
+        ON CREATE SET new.id = $new_id
+        """
+        result = tx.run(query_create_department, new=new_department, new_id=new_department_id)
+        print(f"Created new department: {new_department}, Result: {result.consume().counters.nodes_created} node(s) created")
+
+        # Create relationship from the minister of old department to the new department
+        query_create_minister_relationship = """
+        MATCH (minister:minister)-[rel:HAS_DEPARTMENT]->(old:department {name: $old})
+        WHERE rel.end_time = -1
+        WITH minister, old
+        MATCH (new:department {name: $new})
+        MERGE (minister)-[:HAS_DEPARTMENT {start_time: $date, end_time: -1}]->(new)
+        """
+        result = tx.run(query_create_minister_relationship, old=old_departments[0], new=new_department, date=date)
+        print(f"Created relationship from minister of {old_departments[0]} to {new_department}, "
+                f"Result: {result.consume().counters.relationships_created} relationship(s) created")
+
+        # Step 2: Handle relationships for each old department
+        for old_department in old_departments:
+            
+            # Terminate relationship between minister and old department
+            query_terminate_minister_relationship = """
+            MATCH (minister:minister)-[rel:HAS_DEPARTMENT]->(old:department {name: $old})
+            WHERE rel.end_time = -1
+            SET rel.end_time = $date
+            """
+            result = tx.run(query_terminate_minister_relationship, old=old_department, date=date)
+            print(f"Terminated relationship from minister to {old_department}, "
+                  f"Result: {result.consume().counters.properties_set} property(s) updated")
+
+            # Create MERGED_INTO relationship
+            query_create_merged_into = """
+            MATCH (old:department {name: $old}), (new:department {name: $new})
+            CREATE (old)-[:MERGED_INTO {start_date: $date}]->(new)
+            """
+            result = tx.run(query_create_merged_into, old=old_department, new=new_department, date=date)
+            print(f"Created MERGED_INTO relationship from {old_department} to {new_department}, "
+                  f"Result: {result.consume().counters.relationships_created} relationship(s) created")
+
+        return entity_counters["department"]+1
+
+    except Exception as e:
+        print(f"Error processing merge departments transaction: {transaction['transaction_id']}, Error: {e}")
+        raise  # Rethrow the exception to allow rollback
+
 
 # Main function to load transactions and execute them in order
 def execute_transactions():
     transactions = load_transactions()
     
-    entity_counters = {"Minister": 0, "Department": 0}  # Initialize counters for entity types
+    entity_counters = {"minister": 0, "department": 0}  # Initialize counters for entity types
     
     
     with neo4j_interface.driver.session() as session:
@@ -205,7 +350,7 @@ def execute_transactions():
                 try:
                     # Identify the correct function to call based on file type and type
                     if transaction["file_type"] == "Rename" and transaction["type"] == "minister":
-                        entity_counters["Minister"] = rename_minister(tx, transaction, entity_counters)
+                        entity_counters["minister"] = rename_minister(tx, transaction, entity_counters)
                         print(f"Processed Rename Minister transaction: {transaction['transaction_id']}")
                     elif transaction["file_type"] == "Move" and transaction["type"] == "department":
                         move_department(tx, transaction)
@@ -217,6 +362,12 @@ def execute_transactions():
                     elif transaction["file_type"] == "Terminate":
                         terminate_entity(tx, transaction)
                         print(f"Processed Terminate transaction: {transaction['transaction_id']}")
+                    elif transaction["file_type"] == "Merge" and transaction["type"] == "minister":
+                        entity_counters['minister'] = merge_ministers(tx, transaction, entity_counters)
+                        print(f"Processed Merge Ministers transaction: {transaction['transaction_id']}")
+                    elif transaction["file_type"] == "Merge" and transaction["type"] == "department":
+                        entity_counters["department"] = merge_departments(tx, transaction, entity_counters)
+                        print(f"Processed Merge Departments transaction: {transaction['transaction_id']}")
                 except Exception as e:
                     print(f"Error processing transaction: {transaction['transaction_id']}, Error: {e}")
                     tx.rollback()

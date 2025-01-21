@@ -14,9 +14,9 @@ neo4j_interface = Neo4jInterface()
 def create_constraints(driver: Neo4jInterface):
     """Create unique constraints for nodes."""
     constraints = [
-        "CREATE CONSTRAINT government_name_unique IF NOT EXISTS FOR (g:Government) REQUIRE g.name IS UNIQUE",
-        "CREATE CONSTRAINT minister_name_unique IF NOT EXISTS FOR (m:Minister) REQUIRE m.name IS UNIQUE",
-        "CREATE CONSTRAINT department_name_unique IF NOT EXISTS FOR (d:Department) REQUIRE d.name IS UNIQUE"
+        "CREATE CONSTRAINT government_name_unique IF NOT EXISTS FOR (g:government) REQUIRE g.name IS UNIQUE",
+        "CREATE CONSTRAINT minister_name_unique IF NOT EXISTS FOR (m:minister) REQUIRE m.name IS UNIQUE",
+        "CREATE CONSTRAINT department_name_unique IF NOT EXISTS FOR (d:department) REQUIRE d.name IS UNIQUE"
     ]
     for query in constraints:
         driver.execute_query(query)
@@ -29,7 +29,7 @@ def create_government_nodes(driver: Neo4jInterface, gov_file: str):
     governments = pd.read_csv(gov_file)
     for _, row in governments.iterrows():
         query = """
-        CREATE (:Government {id: $id, name: $name})
+        CREATE (:government {id: $id, name: $name})
         """
         parameters = {
             "id": row["id"],
@@ -42,7 +42,7 @@ def create_minister_nodes(driver: Neo4jInterface, min_file: str):
     ministers = pd.read_csv(min_file)
     for _, row in ministers.iterrows():
         query = """
-        CREATE (:Minister {id: $id, name: $name})
+        CREATE (:minister {id: $id, name: $name})
         """
         parameters = {
             "id": row["id"],
@@ -55,7 +55,7 @@ def create_department_nodes(driver: Neo4jInterface, dep_file: str):
     departments = pd.read_csv(dep_file)
     for _, row in departments.iterrows():
         query = """
-        CREATE (:Department {id: $id, name: $name})
+        CREATE (:department {id: $id, name: $name})
         """
         parameters = {
             "id": row["id"],
@@ -68,7 +68,7 @@ def create_gov_min_relationships(driver: Neo4jInterface, gov_min_file: str):
     gov_min = pd.read_csv(gov_min_file)
     for _, row in gov_min.iterrows():
         query = """
-        MATCH (gov:Government {id: $gov_id}), (min:Minister {id: $min_id})
+        MATCH (gov:government {id: $gov_id}), (min:minister {id: $min_id})
         CREATE (gov)-[:HAS_MINISTER {start_time: $start_time, end_time: $end_time}]->(min)
         """
         parameters = {
@@ -84,7 +84,7 @@ def create_min_dep_relationships(driver: Neo4jInterface, min_dep_file: str):
     min_dep = pd.read_csv(min_dep_file)
     for _, row in min_dep.iterrows():
         query = """
-        MATCH (min:Minister {id: $min_id}), (dep:Department {id: $dep_id})
+        MATCH (min:minister {id: $min_id}), (dep:department {id: $dep_id})
         CREATE (min)-[:HAS_DEPARTMENT {start_time: $start_time, end_time: $end_time}]->(dep)
         """
         parameters = {

@@ -1,6 +1,6 @@
 transaction_id,parent,parent_type,child,child_type,rel_type,date
-2611/11_tr_7,Minister of Agriculture,Minister,Janatha Fertilizer Enterprises Ltd.,Department,HAS_DEPARTMENT,2015-10-15
-2611/11_tr_8,Government of Sri Lanka,Government,Minister of Home Affairs,Minister,HAS_MINISTER,2015-10-15
-2611/11_tr_9,Minister of Home Affairs,Minister,All District Secretariats,Department,HAS_DEPARTMENT,2015-10-15
-2611/11_tr_10,Minister of Home Affairs,Minister,All Divisional Secretariats,Department,HAS_DEPARTMENT,2015-10-15
-2611/11_tr_11,Minister of Home Affairs,Minister,Department of Registrar General,Department,HAS_DEPARTMENT,2015-10-15
+2611/11_tr_07,Minister of Agriculture,minister,Janatha Fertilizer Enterprises Ltd.,department,HAS_DEPARTMENT,2015-10-15
+2611/11_tr_08,Government of Sri Lanka,government,Minister of Home Affairs,minister,HAS_MINISTER,2015-10-15
+2611/11_tr_09,Minister of Home Affairs,minister,All District Secretariats,department,HAS_DEPARTMENT,2015-10-15
+2611/11_tr_10,Minister of Home Affairs,minister,All Divisional Secretariats,department,HAS_DEPARTMENT,2015-10-15
+2611/11_tr_11,Minister of Home Affairs,minister,Department of Registrar General,department,HAS_DEPARTMENT,2015-10-15
