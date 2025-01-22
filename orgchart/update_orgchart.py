@@ -46,7 +46,8 @@ def rename_minister(tx, transaction, entity_counters):
             "date": transaction["date"],
             "parent_type": "government",
             "child_type": "minister",
-            "rel_type": "HAS_MINISTER"
+            "rel_type": "HAS_MINISTER",
+            "transaction_id": transaction["transaction_id"]
         }
 
         # Call add_entity to create the new minister and establish the relationship
@@ -140,12 +141,13 @@ def add_entity(tx, transaction, entity_counters):
         parent_type = transaction["parent_type"]
         child_type = transaction["child_type"]
         rel_type = transaction["rel_type"]
+        transaction_id = transaction["transaction_id"]
 
         # Determine the ID for the new child entity using the child type
         if child_type not in entity_counters:
             raise ValueError(f"Unknown child type: {child_type}")
         
-        prefix = f"gzt_{child_type[:3].lower()}"  # Use the first three letters of the type
+        prefix = f"{transaction_id[:7]}_{child_type[:3].lower()}"  # Use the first three letters of the type
         entity_counter = entity_counters[child_type]+1
         new_entity_id = f"{prefix}_{entity_counter}"
 
@@ -209,6 +211,7 @@ def merge_ministers(tx, transaction, entity_counters):
         old_ministers = eval(transaction["old"])  # Convert string representation of array to list
         new_minister = transaction["new"]
         date = transaction["date"]
+        transaction_id = transaction["transaction_id"]
         
         # Generate a unique ID for the new minister
         if "minister" not in entity_counters:
@@ -224,7 +227,8 @@ def merge_ministers(tx, transaction, entity_counters):
             "date": date,
             "parent_type": "government",
             "child_type": "minister",
-            "rel_type": "HAS_MINISTER"
+            "rel_type": "HAS_MINISTER",
+            "transaction_id": transaction_id
         }
         
         new_minister_counter = add_entity(tx, add_entity_transaction, entity_counters)
@@ -298,7 +302,7 @@ def merge_departments(tx, transaction, entity_counters):
             raise ValueError("Department counter not initialized")
         
         # entity_counters["Department"] += 1
-        new_department_id = f"gzt_dep_{entity_counters['department']+1}"
+        new_department_id = f"{transaction["transaction_id"][:7]}_dep_{entity_counters['department']+1}"
 
         # Step 1: Create the new department
         query_create_department = """
