@@ -1,5 +1,5 @@
 import pandas as pd
-
+from datetime import datetime
 import sys
 import os
 
@@ -67,33 +67,82 @@ def create_gov_min_relationships(driver: Neo4jInterface, gov_min_file: str):
     """Create relationships between Government and Ministry."""
     gov_min = pd.read_csv(gov_min_file)
     for _, row in gov_min.iterrows():
-        query = """
-        MATCH (gov:government {id: $gov_id}), (min:minister {id: $min_id})
-        CREATE (gov)-[:HAS_MINISTER {start_time: $start_time, end_time: $end_time}]->(min)
-        """
-        parameters = {
-            "gov_id": row["gov_id"],
-            "min_id": row["min_id"],
-            "start_time": row["start_time"],
-            "end_time": row.get("end_time", None)  # Handle empty end_time
-        }
+        # Check if 'end_date' is empty or missing
+        # end_date = row.get("end_date", None)
+
+        # Convert 'start_date' and 'end_date' to Neo4j's date format
+        start_date = datetime.strptime(row["start_date"], "%Y-%m-%d").date()
+        end_date = (
+            datetime.strptime(row["end_date"], "%Y-%m-%d").date() if row["end_date"] != -1 else -1
+        )
+        
+        # If end_date is not empty, include it in the query
+        if end_date != -1:
+            query = """
+            MATCH (gov:government {id: $gov_id}), (min:minister {id: $min_id})
+            CREATE (gov)-[:HAS_MINISTER {start_date: date($start_date), end_date: date($end_date)}]->(min)
+            """
+            parameters = {
+                "gov_id": row["gov_id"],
+                "min_id": row["min_id"],
+                "start_date": str(start_date),
+                "end_date": str(end_date)
+            }
+        else:
+            # If end_date is empty, exclude it from the query
+            query = """
+            MATCH (gov:government {id: $gov_id}), (min:minister {id: $min_id})
+            CREATE (gov)-[:HAS_MINISTER {start_date: date($start_date)}]->(min)
+            """
+            parameters = {
+                "gov_id": row["gov_id"],
+                "min_id": row["min_id"],
+                "start_date": str(start_date)
+            }
+        
+        # Execute the query
         driver.execute_query(query, parameters)
+
 
 def create_min_dep_relationships(driver: Neo4jInterface, min_dep_file: str):
     """Create relationships between Ministry and Department."""
     min_dep = pd.read_csv(min_dep_file)
     for _, row in min_dep.iterrows():
-        query = """
-        MATCH (min:minister {id: $min_id}), (dep:department {id: $dep_id})
-        CREATE (min)-[:HAS_DEPARTMENT {start_time: $start_time, end_time: $end_time}]->(dep)
-        """
-        parameters = {
-            "min_id": row["min_id"],
-            "dep_id": row["dep_id"],
-            "start_time": row["start_time"],
-            "end_time": row.get("end_time", None)  # Handle empty end_time
-        }
+        # Check if 'end_date' is empty or missing
+        # end_date = row.get("end_date", None)
+
+        start_date = datetime.strptime(row["start_date"], "%Y-%m-%d").date()
+        end_date = (
+            datetime.strptime(row["end_date"], "%Y-%m-%d").date() if row["end_date"] != -1 else -1
+        )
+
+        # If end_date is not empty, include it in the query
+        if end_date != -1:
+            query = """
+            MATCH (min:minister {id: $min_id}), (dep:department {id: $dep_id})
+            CREATE (min)-[:HAS_DEPARTMENT {start_date: date($start_date), end_date: date($end_date)}]->(dep)
+            """
+            parameters = {
+                "min_id": row["min_id"],
+                "dep_id": row["dep_id"],
+                "start_date": end_date,
+                "end_date": end_date
+            }
+        else:
+            # If end_date is empty, exclude it from the query
+            query = """
+            MATCH (min:minister {id: $min_id}), (dep:department {id: $dep_id})
+            CREATE (min)-[:HAS_DEPARTMENT {start_date: date($start_date)}]->(dep)
+            """
+            parameters = {
+                "min_id": row["min_id"],
+                "dep_id": row["dep_id"],
+                "start_date": start_date
+            }
+        
+        # Execute the query
         driver.execute_query(query, parameters)
+
 
 # Main execution
 def load_data_to_neo4j():
