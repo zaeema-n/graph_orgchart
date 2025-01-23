@@ -69,7 +69,7 @@ To update the db with a new amendment, run `orgchart/update_orgchart.py`. This f
 To directly view and interact with the database, visit `localhost:7474`. Try out the following cypher query:
 
 ```cypher
-match(g:Government)-[r]->(m:Minister)-[y]->(d:Department)
+match(g:government)-[r]->(m:minister)-[y]->(d:department)
 where m.name="Minister of University Education and Highways" or m.name="Minister of Higher Education and Highways" or m.name="Minister of Higher Education and Highways" or m.name="Minister of Skills Development and Vocational Training"
 return m,g,d
 ```
